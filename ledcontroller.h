@@ -16,6 +16,8 @@
 #define STRING_DISPLAY 0
 #define BACKGROUND_ONLY 1
 #define BACKGROUND_STRING_DISPLAY 2
+#define MODE_CLOCK 3
+#define BACKGROUND_MODE_CLOCK 4
 
 
 // Methods
@@ -24,6 +26,7 @@ void LedLoop();
 
 void SetBrightness(float v);
 void SetBackgroundBrightness(float v);
+void Clear();
 
 void ResetToBackground();
 

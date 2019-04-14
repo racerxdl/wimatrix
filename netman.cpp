@@ -1,19 +1,18 @@
-#include <ESP8266WiFi.h>
 #include <ArduinoJson.h>
 #include <MQTT.h>
+#include <WiFi.h>
+#include <WiFiUdp.h>
 
+#include "storage.h"
 #include "netman.h"
 #include "ledcontroller.h"
 
-
-#define MQTTIP "10.10.5.115"
 #define MQTTPORT 1883
-#define MQTTUSER "mqtt_user"
-#define MQTTPASS "mqtt_pass"
 
 #define MSGTOPIC "_msg"
 #define BRIGHTNESSTOPIC "_brightness"
 #define BGBRIGHTNESSTOPIC "_bgbrightness"
+#define MODETOPIC "_mode"
 
 MQTTClient client(2048);
 WiFiClient net;
@@ -21,19 +20,24 @@ WiFiClient net;
 String msgTopic = MSGTOPIC;
 String brightnessTopic = BRIGHTNESSTOPIC;
 String bgBrightnessTopic = BGBRIGHTNESSTOPIC;
+String modeTopic = MODETOPIC;
 
 String deviceData;
 
-void parseMessage(String message) {
-  DynamicJsonBuffer jsonBuffer;
-  JsonObject& obj = jsonBuffer.parseObject(message);
-  if (obj.success()) {
-    uint8_t r = obj["r"], g = obj["g"], b = obj["b"];
-    int x = obj["x"];
-    int y = obj["y"];
-    int a = obj["align"];
+DynamicJsonDocument inputDocument(2048);
 
-    String msg = obj["msg"];
+void parseMessage(String message) {
+  auto error = deserializeJson(inputDocument, message);
+  if (!error) {
+    uint8_t r = inputDocument["r"],
+            g = inputDocument["g"],
+            b = inputDocument["b"];
+
+    int x = inputDocument["x"];
+    int y = inputDocument["y"];
+    int a = inputDocument["align"];
+
+    String msg = inputDocument["msg"];
     CRGB color(r,g,b);
 
     Serial.print("Received \"");
@@ -41,12 +45,13 @@ void parseMessage(String message) {
     Serial.print("\" with color ");
     Serial.println(color);
     if (!a && (x != 0 || y != 0)) {
-      LedPrintAt(x, y, obj["msg"].as<String>().c_str(), color);
+      LedPrintAt(x, y, inputDocument["msg"].as<String>().c_str(), color);
     } else {
-      LedPrint(obj["msg"].as<String>().c_str(), color);
+      LedPrint(inputDocument["msg"].as<String>().c_str(), color);
     }
   } else {
     Serial.print("Invalid JSON: ");
+    Serial.println(error.c_str());
     Serial.println(message);
   }
 }
@@ -67,12 +72,17 @@ void messageReceived(String &topic, String &payload) {
     return;
   }
 
+  if (topic == modeTopic) {
+    SetMode(payload.toInt());
+    return;
+  }
+
   Serial.print("Unknown topic: ");
   Serial.println(topic);
 }
 
 void Subscribe(String &topic) {
-  topic = String(WiFi.hostname()) + topic;
+  topic = String(WiFi.getHostname()) + topic;
   client.subscribe(topic);
 
   Serial.print("Subscribing to topic ");
@@ -80,12 +90,13 @@ void Subscribe(String &topic) {
 }
 
 void RefreshDeviceData() {
-  DynamicJsonBuffer jsonBuffer;
-  JsonObject& root = jsonBuffer.createObject();
-  JsonObject &network = jsonBuffer.createObject();
+  DynamicJsonDocument jsonBuffer(1024);
+  JsonObject root = jsonBuffer.to<JsonObject>();
+  JsonObject network = jsonBuffer.createNestedObject("network");
+  JsonArray functions = jsonBuffer.createNestedArray("functions");
 
-  root["name"] = WiFi.hostname();
-  root["uid"] = String(ESP.getChipId(), HEX) + WiFi.macAddress();
+  root["name"] = WiFi.getHostname();
+  root["uid"] = String((long int)ESP.getEfuseMac(), HEX) + WiFi.macAddress();
   root["ssid"] = WiFi.SSID();
 
   network["ip"] = WiFi.localIP().toString();
@@ -93,16 +104,37 @@ void RefreshDeviceData() {
   network["gateway"] = WiFi.gatewayIP().toString();
   network["rssi"] = WiFi.RSSI();
 
-  root["network"] = network;
+  JsonObject displayFunction = functions.createNestedObject();
+  JsonObject brightnessFunction = functions.createNestedObject();
+  JsonObject bgBrightnessFunction = functions.createNestedObject();
+  JsonObject modeFunction = functions.createNestedObject();
+
+  displayFunction["type"] = "display";
+  displayFunction["subtopic"] = MSGTOPIC;
+  displayFunction["name"] = "Text Display";
+
+  brightnessFunction["type"] = "float_variable";
+  brightnessFunction["subtopic"] = BRIGHTNESSTOPIC;
+  brightnessFunction["name"] = "Text Brightness";
+
+  bgBrightnessFunction["type"] = "float_variable";
+  bgBrightnessFunction["subtopic"] = BGBRIGHTNESSTOPIC;
+  bgBrightnessFunction["name"] = "Background Brightness";
+
+  modeFunction["type"] = "int_variable";
+  modeFunction["subtopic"] = MODETOPIC;
+  modeFunction["name"] = "Display Mode";
 
   deviceData = "";
-  root.printTo(deviceData);
+  serializeJson(root, deviceData);
 }
 
 void clientConnect() {
+  String mqttUser = GetMQTTUser();
+  String mqttPass = GetMQTTPass();
   Serial.println("Connecting...");
   LedPrint("MQTT Connecting...", CRGB::Yellow);
-  while (!client.connect(WiFi.hostname().c_str(), MQTTUSER, MQTTPASS)) {
+  while (!client.connect(WiFi.getHostname(), mqttUser.c_str(), mqttPass.c_str())) {
     Serial.print(".");
     delay(100);
     LedLoop();
@@ -120,16 +152,19 @@ void clientConnect() {
   msgTopic = String(MSGTOPIC);
   brightnessTopic = String(BRIGHTNESSTOPIC);
   bgBrightnessTopic = String(BGBRIGHTNESSTOPIC);
+  modeTopic = String(MODETOPIC);
 
   // Subscribe
   Subscribe(msgTopic);
   Subscribe(brightnessTopic);
   Subscribe(bgBrightnessTopic);
+  Subscribe(modeTopic);
 }
 
 void SetupMQTT() {
+  String mqttHost = GetMQTTHost();
   Serial.println("Setting up MQTT");
-  client.begin(MQTTIP, MQTTPORT, net);
+  client.begin(mqttHost.c_str(), MQTTPORT, net);
   client.onMessage(messageReceived);
 
   clientConnect();

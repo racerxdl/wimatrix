@@ -67,8 +67,8 @@ def on_message(client, userdata, msg):
 client = mqtt.Client(userdata=userData)
 client.on_connect = on_connect
 client.on_message = on_message
-client.username_pw_set("mqtt_user", password="mqtt_pass")
-client.connect("odroid-radio.local", 1883, 60)
+client.username_pw_set("mqtt_user", password="----")
+client.connect("192.168.0.100", 1883, 60)
 
 lastChange = time.time()
 lastUpdate = time.time()

@@ -1,24 +1,52 @@
-#include <ESP8266WiFi.h>
-#include <ESP8266mDNS.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 #include "ledcontroller.h"
 #include "wifi.h"
+#include "storage.h"
 
-#define WifiSSID "WIFI"
-#define HOSTNAME "WIMATRIX"
+String ssid     = "";
+String password = "";
+String otaPassword = "";
+String hostname = "";
 
-String ssid     = WifiSSID;
-String password = "1234567890";
+WiFiUDP ntpUDP;
+
+int16_t utc = -3; //UTC -3:00 Brazil
+uint32_t currentMillis = 0;
+uint32_t previousMillis = 0;
+
+NTPClient timeClient(ntpUDP, "a.st1.ntp.br", utc*3600, 60000);
+
+bool inOTA = false;
+
+int getHours() {
+  return timeClient.getHours();
+}
+
+int getMinutes() {
+  return timeClient.getMinutes();
+}
+
+int getSeconds() {
+  return timeClient.getSeconds();
+}
 
 void SetupWiFi() {
-  OnOTA = false;
+  ssid = GetWifiSSID();
+  password = GetWifiPassword();
+  hostname = GetHostname();
+  inOTA = false;
   Serial.println("\r\n");
   Serial.print("Chip ID: 0x");
-  Serial.println(ESP.getChipId(), HEX);
+  Serial.println((long int)ESP.getEfuseMac(), HEX);
 
   // Set Hostname.
-  String hostname(HOSTNAME);
-  hostname += String(ESP.getChipId(), HEX);
-  WiFi.hostname(hostname);
+  if (hostname == "") {
+    hostname = "WIMATRIX-";
+    hostname += String((long int)ESP.getEfuseMac(), HEX);
+  }
+  Serial.print("Hostname: ");
+  Serial.println(hostname);
 
   Serial.println("Setting up WiFi");
   Serial.print("SSID: ");
@@ -26,14 +54,17 @@ void SetupWiFi() {
   Serial.print("Password: ");
   Serial.println(password);
 
-  LedPrint("WiFi (" WifiSSID ")", CRGB::Red);
+  String tmp = "WiFi (";
+  tmp += ssid;
+  tmp += ")";
+
+  LedPrint(tmp.c_str(), CRGB::Red);
 
   if (WiFi.getMode() != WIFI_STA) {
     WiFi.mode(WIFI_STA);
     LedLoop();
     delay(10);
   }
-
 
   if (WiFi.SSID() != ssid || WiFi.psk() != password) {
     Serial.println("WiFi config changed.");
@@ -46,6 +77,10 @@ void SetupWiFi() {
   } else {
     WiFi.begin();
   }
+
+  WiFi.setHostname(hostname.c_str());
+  Serial.print("Hostname: ");
+  Serial.println(WiFi.getHostname());
 
   unsigned long startTime = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
@@ -62,7 +97,12 @@ void SetupWiFi() {
     // ... print IP Address
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
-    LedPrint("WiFi (" WifiSSID ")", CRGB::Green);
+
+    tmp = "WiFi (";
+    tmp += ssid;
+    tmp += ")";
+
+    LedPrint(tmp.c_str(), CRGB::Green);
     delay(1500);
   } else {
     LedPrint("WiFi", CRGB::Yellow);
@@ -86,7 +126,9 @@ void SetupWiFi() {
   ArduinoOTA.setHostname((const char *)hostname.c_str());
 
   ArduinoOTA.onStart([]() {
-    OnOTA = true;
+    SetMode(BACKGROUND_STRING_DISPLAY);
+    SetBrightness(0.5);
+    inOTA = true;
     Serial.println("OTA Update Start");
     LedPrint("OTA", CRGB::Yellow);
   });
@@ -115,5 +157,16 @@ void SetupWiFi() {
   });
 
   ArduinoOTA.begin();
+
+  // NTP
+  timeClient.begin();
+  timeClient.update();
 }
 
+void WiFiLoop() {
+  timeClient.update();
+}
+
+bool InOTA() {
+  return inOTA;
+}

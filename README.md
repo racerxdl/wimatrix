@@ -1,7 +1,7 @@
 WiMatrix
 ========
 
-Runs on ESP8266 (NodeMCU)
+Runs on ESP32 (NodeMCU-32S)
 
 TODO: Write documentation
 
@@ -21,4 +21,5 @@ LTC: Ldwj7RYgPC1QRCBSJ1ZwKKYpJBDpaTTnmc
 Also consider tiping as well the other creators of the libraries that helped this project:
 
 [FastLED](https://github.com/FastLED/FastLED)
+
 [Arduino MQTT](https://github.com/256dpi/arduino-mqtt)

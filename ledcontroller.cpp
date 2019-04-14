@@ -1,13 +1,14 @@
 #include "Arduino.h"
 #include "ledcontroller.h"
 #include "font.h"
+#include "wifi.h"
 
 #define MATRIX_W 30
 #define MATRIX_H 10
 #define NUM_LEDS (MATRIX_W * MATRIX_H)
 
-// GPIO5 - D1
-#define DATA_PIN 1
+// GPIO18 - VSPISCK
+#define DATA_PIN 18
 
 // Define the array of leds
 CRGB leds[NUM_LEDS];
@@ -66,10 +67,17 @@ int StringDisplayLoop(int resetBg) {
       }
       timeHolder = millis();
     }
-
-    return WriteStringAt(scrollX / scrollFactor, scrollY / scrollFactor, buffer, bufferColor);
+    if (resetBg) {
+      return WriteStringAt(scrollX / scrollFactor, scrollY / scrollFactor, buffer, bufferColor, CRGB::Black);
+    } else {
+      return WriteStringAt(scrollX / scrollFactor, scrollY / scrollFactor, buffer, bufferColor);
+    }
   } else {
-    return WriteStringAt(scrollX / scrollFactor, scrollY / scrollFactor, buffer, bufferColor);
+    if (resetBg) {
+      return WriteStringAt(scrollX / scrollFactor, scrollY / scrollFactor, buffer, bufferColor, CRGB::Black);
+    } else {
+      return WriteStringAt(scrollX / scrollFactor, scrollY / scrollFactor, buffer, bufferColor);
+    }
   }
 }
 
@@ -94,8 +102,7 @@ int BackgroundDisplayLoop() {
 }
 
 inline int BackgroundStringDisplayLoop() {
-  int x = 0;
-  x += BackgroundDisplayLoop();
+  int x = BackgroundDisplayLoop();
   x += StringDisplayLoop(0);
   return x;
 }
@@ -127,17 +134,30 @@ void LedPrint(const char *text, CRGB color) {
   LedLoop();
 }
 
-void LedLoop() {
-  int changed = 0;
-  switch (state) {
-    case STRING_DISPLAY: changed = StringDisplayLoop(1); break;
-    case BACKGROUND_ONLY: changed = BackgroundDisplayLoop(); break;
-    case BACKGROUND_STRING_DISPLAY: changed = BackgroundStringDisplayLoop(); break;
-  }
+char clockBuffer[8];
+CRGB clockColor = CRGB::Red;
 
-  if (changed) {
-    FastLED.show();
+int ModeClockLoop(int resetBg) {
+  int hours = getHours();
+  int minutes = getMinutes();
+  int seconds = getSeconds();
+  char dots = seconds % 2 ? ':' : ' ';
+
+  memset(clockBuffer, 0x00, 8);
+  sprintf(clockBuffer, "%02d%c%02d", hours, dots, minutes);
+
+  if (resetBg) {
+    return WriteStringAt(0, 0, clockBuffer, clockColor, CRGB::Black);
+  } else {
+    return WriteStringAt(0, 0, clockBuffer, clockColor);
   }
+}
+
+int BackgroundModeClockLoop() {
+  int x = BackgroundDisplayLoop(); // TODO: Cache write
+  x += ModeClockLoop(0);
+
+  return x;
 }
 
 void ResetToBackground() {
@@ -262,4 +282,20 @@ void SetBackgroundBrightness(float v) {
   bgBrightness = (uint8_t) (v * 255);
   Serial.print("New BG Brightness: ");
   Serial.println(bgBrightness);
+}
+
+
+void LedLoop() {
+  int changed = 0;
+  switch (state) {
+    case STRING_DISPLAY: changed = StringDisplayLoop(1); break;
+    case BACKGROUND_ONLY: changed = BackgroundDisplayLoop(); break;
+    case BACKGROUND_STRING_DISPLAY: changed = BackgroundStringDisplayLoop(); break;
+    case MODE_CLOCK: changed = ModeClockLoop(1); break;
+    case BACKGROUND_MODE_CLOCK: changed = BackgroundModeClockLoop(); break;
+  }
+
+  if (changed) {
+    FastLED.show();
+  }
 }
