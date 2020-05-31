@@ -7,9 +7,6 @@
 #define MATRIX_H 10
 #define NUM_LEDS (MATRIX_W * MATRIX_H)
 
-// GPIO18 - VSPISCK
-#define DATA_PIN 18
-
 // Define the array of leds
 CRGB leds[NUM_LEDS];
 
@@ -22,7 +19,7 @@ CRGB bufferColor;
 
 int scrollX = 0;
 int scrollY = 0;
-int scrollSpeed = 6; // 10 px / s
+int scrollSpeed = 12; // 10 px / s
 
 uint8_t brightness = 255;
 uint8_t bgBrightness = 255;
@@ -59,6 +56,9 @@ void SetupLeds() {
 
 int StringDisplayLoop(int resetBg) {
   int buffLen = strlen(buffer);
+  if (resetBg) {
+    Clear();
+  }
   if (buffLen * font16_10_charWidth > MATRIX_W) { // Needs scroll
     if (millis() - timeHolder > (1000 / scrollFactor)) {
       scrollX -= scrollSpeed;
@@ -147,6 +147,7 @@ int ModeClockLoop(int resetBg) {
   sprintf(clockBuffer, "%02d%c%02d", hours, dots, minutes);
 
   if (resetBg) {
+    Clear();
     return WriteStringAt(0, 0, clockBuffer, clockColor, CRGB::Black);
   } else {
     return WriteStringAt(0, 0, clockBuffer, clockColor);
@@ -168,8 +169,18 @@ void ResetToBackground() {
   }
 }
 
+void Clear() {
+  for (int i=0; i<NUM_LEDS; i++) {
+    leds[i] = CRGB::Black;
+  }
+}
+
 inline CRGB GetPixel(int x, int y) {
   return leds[y * MATRIX_W + x];
+}
+
+void LedPrintSetColor(CRGB color) {
+  bufferColor = color;
 }
 
 inline int SetPixel(int x, int y, CRGB color) {
@@ -282,6 +293,14 @@ void SetBackgroundBrightness(float v) {
   bgBrightness = (uint8_t) (v * 255);
   Serial.print("New BG Brightness: ");
   Serial.println(bgBrightness);
+}
+
+void SetBackgroundColor(CRGB color) {
+  for(int x = 0; x < MATRIX_W; x++) {
+    for (int y = 0; y < MATRIX_H; y++) {
+      SetBackground(x, y, color);
+    }
+  }
 }
 
 

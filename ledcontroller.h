@@ -8,8 +8,10 @@
 // How many leds in your strip?
 #define NUM_LEDS (MATRIX_W * MATRIX_H)
 
-// GPIO5 - D1
-#define DATA_PIN 1
+#define DATA_PIN 12
+
+// GPIO18 - VSPISCK
+//#define DATA_PIN 18
 
 
 // Controller State
@@ -26,6 +28,7 @@ void LedLoop();
 
 void SetBrightness(float v);
 void SetBackgroundBrightness(float v);
+void SetBackgroundColor(CRGB color);
 void Clear();
 
 void ResetToBackground();
@@ -34,6 +37,7 @@ void SetBackground(int x, int y, CRGB color);
 void SetMode(int mode);
 void LedPrint(const char *text, CRGB color);
 void LedPrintAt(int x, int y, const char *text, CRGB color);
+void LedPrintSetColor(CRGB color);
 
 int WriteCharAt(int x, int y, uint8_t charToPut, CRGB fgColor);
 int WriteCharAt(int x, int y, uint8_t charToPut, CRGB fgColor, CRGB bgColor);

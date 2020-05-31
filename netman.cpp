@@ -13,6 +13,8 @@
 #define BRIGHTNESSTOPIC "_brightness"
 #define BGBRIGHTNESSTOPIC "_bgbrightness"
 #define MODETOPIC "_mode"
+#define TEXTCOLORTOPIC "_textcolor"
+#define BGCOLORTOPIC "_bgcolor"
 
 MQTTClient client(2048);
 WiFiClient net;
@@ -21,6 +23,8 @@ String msgTopic = MSGTOPIC;
 String brightnessTopic = BRIGHTNESSTOPIC;
 String bgBrightnessTopic = BGBRIGHTNESSTOPIC;
 String modeTopic = MODETOPIC;
+String textColorTopic = TEXTCOLORTOPIC;
+String bgColorTopic = BGCOLORTOPIC;
 
 String deviceData;
 
@@ -56,6 +60,40 @@ void parseMessage(String message) {
   }
 }
 
+void parseColor(String message) {
+  auto error = deserializeJson(inputDocument, message);
+  if (!error) {
+    uint8_t r = inputDocument["r"],
+            g = inputDocument["g"],
+            b = inputDocument["b"];
+    CRGB color = CRGB(r,g,b);
+    LedPrintSetColor(color);
+    Serial.print("Received text color");
+    Serial.println(color);
+  } else {
+    Serial.print("Invalid JSON: ");
+    Serial.println(error.c_str());
+    Serial.println(message);
+  }
+}
+
+void parseBGColor(String message) {
+  auto error = deserializeJson(inputDocument, message);
+  if (!error) {
+    uint8_t r = inputDocument["r"],
+            g = inputDocument["g"],
+            b = inputDocument["b"];
+    CRGB color = CRGB(r,g,b);
+    SetBackgroundColor(color);
+    Serial.print("Received background color");
+    Serial.println(color);
+  } else {
+    Serial.print("Invalid JSON: ");
+    Serial.println(error.c_str());
+    Serial.println(message);
+  }
+}
+
 void messageReceived(String &topic, String &payload) {
   if (topic == msgTopic) {
     parseMessage(payload);
@@ -74,6 +112,16 @@ void messageReceived(String &topic, String &payload) {
 
   if (topic == modeTopic) {
     SetMode(payload.toInt());
+    return;
+  }
+
+  if (topic == textColorTopic) {
+    parseColor(payload);
+    return;
+  }
+
+  if (topic == bgColorTopic) {
+    parseBGColor(payload);
     return;
   }
 
@@ -108,6 +156,8 @@ void RefreshDeviceData() {
   JsonObject brightnessFunction = functions.createNestedObject();
   JsonObject bgBrightnessFunction = functions.createNestedObject();
   JsonObject modeFunction = functions.createNestedObject();
+  JsonObject textColorFunction = functions.createNestedObject();
+  JsonObject bgColorFunction = functions.createNestedObject();
 
   displayFunction["type"] = "display";
   displayFunction["subtopic"] = MSGTOPIC;
@@ -124,6 +174,14 @@ void RefreshDeviceData() {
   modeFunction["type"] = "int_variable";
   modeFunction["subtopic"] = MODETOPIC;
   modeFunction["name"] = "Display Mode";
+
+  textColorFunction["type"] = "json";
+  textColorFunction["subtopic"] = TEXTCOLORTOPIC;
+  textColorFunction["name"] = "Text Color";
+
+  bgColorFunction["type"] = "json";
+  bgColorFunction["subtopic"] = BGCOLORTOPIC;
+  bgColorFunction["name"] = "Background Color";
 
   deviceData = "";
   serializeJson(root, deviceData);
@@ -153,12 +211,16 @@ void clientConnect() {
   brightnessTopic = String(BRIGHTNESSTOPIC);
   bgBrightnessTopic = String(BGBRIGHTNESSTOPIC);
   modeTopic = String(MODETOPIC);
+  textColorTopic = String(TEXTCOLORTOPIC);
+  bgColorTopic = String(BGCOLORTOPIC);
 
   // Subscribe
   Subscribe(msgTopic);
   Subscribe(brightnessTopic);
   Subscribe(bgBrightnessTopic);
   Subscribe(modeTopic);
+  Subscribe(textColorTopic);
+  Subscribe(bgColorTopic);
 }
 
 void SetupMQTT() {
