@@ -15,6 +15,7 @@
 #define MODETOPIC "_mode"
 #define TEXTCOLORTOPIC "_textcolor"
 #define BGCOLORTOPIC "_bgcolor"
+#define SCROLLSPEEDTOPIC "_scrollspeed"
 
 MQTTClient client(2048);
 WiFiClient net;
@@ -25,6 +26,7 @@ String bgBrightnessTopic = BGBRIGHTNESSTOPIC;
 String modeTopic = MODETOPIC;
 String textColorTopic = TEXTCOLORTOPIC;
 String bgColorTopic = BGCOLORTOPIC;
+String scrollSpeedTopic = SCROLLSPEEDTOPIC;
 
 String deviceData;
 
@@ -94,6 +96,14 @@ void parseBGColor(String message) {
   }
 }
 
+void parseScrollSpeed(int speed) {
+  if (speed > 80 || speed < 5) {
+    return;
+  }
+
+  SetScrollSpeed(speed);
+}
+
 void messageReceived(String &topic, String &payload) {
   if (topic == msgTopic) {
     parseMessage(payload);
@@ -122,6 +132,11 @@ void messageReceived(String &topic, String &payload) {
 
   if (topic == bgColorTopic) {
     parseBGColor(payload);
+    return;
+  }
+
+  if (topic == scrollSpeedTopic) {
+    parseScrollSpeed(payload.toInt());
     return;
   }
 
@@ -158,6 +173,7 @@ void RefreshDeviceData() {
   JsonObject modeFunction = functions.createNestedObject();
   JsonObject textColorFunction = functions.createNestedObject();
   JsonObject bgColorFunction = functions.createNestedObject();
+  JsonObject scrollSpeedFunction = functions.createNestedObject();
 
   displayFunction["type"] = "display";
   displayFunction["subtopic"] = MSGTOPIC;
@@ -182,6 +198,10 @@ void RefreshDeviceData() {
   bgColorFunction["type"] = "json";
   bgColorFunction["subtopic"] = BGCOLORTOPIC;
   bgColorFunction["name"] = "Background Color";
+
+  scrollSpeedFunction["type"] = "int";
+  scrollSpeedFunction["subtopic"] = SCROLLSPEEDTOPIC;
+  scrollSpeedFunction["name"] = "Scroll Speed";
 
   deviceData = "";
   serializeJson(root, deviceData);
@@ -213,6 +233,7 @@ void clientConnect() {
   modeTopic = String(MODETOPIC);
   textColorTopic = String(TEXTCOLORTOPIC);
   bgColorTopic = String(BGCOLORTOPIC);
+  scrollSpeedTopic = String(SCROLLSPEEDTOPIC);
 
   // Subscribe
   Subscribe(msgTopic);
@@ -221,6 +242,7 @@ void clientConnect() {
   Subscribe(modeTopic);
   Subscribe(textColorTopic);
   Subscribe(bgColorTopic);
+  Subscribe(scrollSpeedTopic);
 }
 
 void SetupMQTT() {

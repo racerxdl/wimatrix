@@ -13,6 +13,9 @@ CRGB leds[NUM_LEDS];
 // Define Background
 CRGB background[NUM_LEDS];
 
+// Define increment speed
+uint8_t incrementPerCycle = 5;
+
 int state = STRING_DISPLAY;
 char buffer[8192];
 CRGB bufferColor;
@@ -23,6 +26,9 @@ int scrollSpeed = 12; // 10 px / s
 
 uint8_t brightness = 255;
 uint8_t bgBrightness = 255;
+
+uint8_t targetBrightness = 255;
+uint8_t targetBgBrightness = 255;
 
 const int scrollFactor = 10;
 
@@ -284,15 +290,15 @@ int WriteCharAt(int x, int y, uint8_t charToPut, CRGB fgColor) {
 }
 
 void SetBrightness(float v) {
-  brightness = (uint8_t) (v * 255);
+  targetBrightness = (uint8_t) (v * 255);
   Serial.print("New Brightness: ");
-  Serial.println(brightness);
+  Serial.println(targetBrightness);
 }
 
 void SetBackgroundBrightness(float v) {
-  bgBrightness = (uint8_t) (v * 255);
+  targetBgBrightness = (uint8_t) (v * 255);
   Serial.print("New BG Brightness: ");
-  Serial.println(bgBrightness);
+  Serial.println(targetBgBrightness);
 }
 
 void SetBackgroundColor(CRGB color) {
@@ -303,6 +309,73 @@ void SetBackgroundColor(CRGB color) {
   }
 }
 
+void BrightChange() {
+  // Use int to get overflows
+  int bgbright = (int)bgBrightness;
+  int bright = (int)brightness;
+
+  // Smooth out changes in brightness to avoid fault injection
+  // due consumption peak
+  if (bgBrightness != targetBgBrightness) {
+    if (bgbright > targetBgBrightness) {
+      bgbright -= incrementPerCycle;
+    } else {
+      bgbright += incrementPerCycle;
+    }
+  }
+  if (bright != targetBrightness) {
+    if (bright > targetBrightness) {
+      bright -= incrementPerCycle;
+    } else {
+      bright += incrementPerCycle;
+    }
+  }
+
+  // If the incrementPerCycle is bigger than the difference between bgbright, wrap it.
+
+  // --- BG Brightness ---
+  if (targetBgBrightness > bgbright && (targetBgBrightness - bgbright) < incrementPerCycle) {
+    bgbright = targetBgBrightness;
+  }
+
+  if (targetBgBrightness < bgbright && (bgbright - targetBgBrightness) < incrementPerCycle) {
+    bgbright = targetBgBrightness;
+  }
+  // --- BG Brightness ---
+
+  // --- Text Brightness ---
+  if (targetBrightness > bright && (targetBrightness - bright) < incrementPerCycle) {
+    bright = targetBrightness;
+  }
+
+  if (targetBrightness < bright && (bright - targetBrightness) < incrementPerCycle) {
+    bright = targetBrightness;
+  }
+  // --- Text Brightness ---
+
+  if (bgbright < 0) {
+    bgbright = 0;
+  }
+  if (bgbright > 255) {
+    bgbright = 255;
+  }
+
+  if (bright < 0) {
+    bright = 0;
+  }
+  if (bright > 255) {
+    bright = 255;
+  }
+
+  bgBrightness = (uint8_t) bgbright;
+  brightness = (uint8_t) bright;
+}
+
+void SetScrollSpeed(int speed) {
+  scrollSpeed = speed;
+  Serial.print("New Scroll Speed: ");
+  Serial.println(scrollSpeed);
+}
 
 void LedLoop() {
   int changed = 0;
@@ -313,6 +386,8 @@ void LedLoop() {
     case MODE_CLOCK: changed = ModeClockLoop(1); break;
     case BACKGROUND_MODE_CLOCK: changed = BackgroundModeClockLoop(); break;
   }
+
+  BrightChange();
 
   if (changed) {
     FastLED.show();

@@ -38,6 +38,7 @@ void SetMode(int mode);
 void LedPrint(const char *text, CRGB color);
 void LedPrintAt(int x, int y, const char *text, CRGB color);
 void LedPrintSetColor(CRGB color);
+void SetScrollSpeed(int);
 
 int WriteCharAt(int x, int y, uint8_t charToPut, CRGB fgColor);
 int WriteCharAt(int x, int y, uint8_t charToPut, CRGB fgColor, CRGB bgColor);
